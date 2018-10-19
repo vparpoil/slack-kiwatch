@@ -13,6 +13,11 @@ Copy the config file before editing it with your entries
 
 `cp config.default.js config.js`
 
+## How it works
+
+From slack, calls to `/alarme on` set the mode to INTRUSION, and `/alarme off` set the mode to NONE
+
+Emails sent by kiwatch as alerts are processed by zapier and sent to the alarme function (using the `ZAPIER_TOKEN` configuration token as `body.token`), which responds and sends a message to slack (using the `SLACK_WEBHOOKURL) with action buttons.
 
 
 ## Very useful resources to get started
@@ -22,3 +27,4 @@ Copy the config file before editing it with your entries
 
 [tutorial]: https://cloud.google.com/functions/docs/tutorials/slack
 [code]: https://github.com/GoogleCloudPlatform/nodejs-docs-samples/tree/master/functions/slack
+``
