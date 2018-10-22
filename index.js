@@ -198,7 +198,7 @@ async function gestionAlarme(query, requestBody) {
 
 function incomingMail(body) {
     let email = body.email;
-    console.log("email", JSON.stringify(email))
+    //console.log("email", JSON.stringify(email))
     // exemple of message : "Un Mouvement a été détecté sur la caméra Entrée ."
     let message = email.split('\n')[0];
 
@@ -230,7 +230,7 @@ function incomingMail(body) {
                 attachment_type: "default",
                 callback_id: "buttonsAlerteEmail",
                 image_url: url,
-                /*actions: [
+                actions: [
                     {
                         name: "ok",
                         value: "ok",
@@ -245,7 +245,7 @@ function incomingMail(body) {
                         style: "danger",
                         text: "C'est suspect, donne l'alerte",
                     }
-                ]*/
+                ]
             }
         ]
 
@@ -257,6 +257,33 @@ function incomingMail(body) {
     return "";
 }
 
+async function handleInteractiveMessage(body) {
+    if (body.callback_id === "buttonsAlerteEmail") {
+
+        let originalMessage = body.original_message;
+        let text, color;
+        if (body.actions[0].value === "ok") {
+            text = `Alarme désactivée par ${body.user.name}`;
+            color = green
+            await logInOnKiwatch();
+            for (let index in CAMERAS) {
+                const camera = CAMERAS[index];
+                await setDetectionService(camera.ressourceId, "NONE");
+            }
+        }
+        else if (body.actions[0].value === "alert") {
+            text = `Demande d'alerte par ${body.user.name} - SANS EFFET POUR LE MOMENT (à venir)`;
+            color = red
+        }
+        // replace the buttons with the following
+        originalMessage.attachments[0].actions = [];
+        originalMessage.attachments.push({title: text, color: color});
+        //originalMessage.response_type = 'in_channel';
+
+        return originalMessage;
+    }
+}
+
 exports.alarme = (req, res) => {
     return Promise.resolve()
         .then(() => {
@@ -266,19 +293,31 @@ exports.alarme = (req, res) => {
                 throw error;
             }
 
+            // handle interactive messages payloads
+            let body = req.body;
+            if (body.payload) {
+                body = JSON.parse(body.payload)
+            }
+
             // Verify that this request came from Slack or Zappier
-            const client = verifyWebhook(req.body);
-            console.log("body", req.body);
+            const client = verifyWebhook(body);
+            //console.log("body", body);
             if (client === "slack") {
-                // todo filter here on request from /alarme and responses to buttons
-                return gestionAlarme(req.body.text, req.body);
+                if (body.type === "interactive_message") {
+                    return handleInteractiveMessage(body);
+                }
+                else {
+                    return gestionAlarme(body.text, body);
+                }
             }
             else if (client === "zapier") {
-                return incomingMail(req.body);
+                return incomingMail(body);
             }
         })
         .then((response) => {
             // Send the formatted message back to Slack
+            //console.log("response")
+            //console.log(response)
             res.json(response);
         })
         .catch((err) => {
