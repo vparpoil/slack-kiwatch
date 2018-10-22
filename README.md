@@ -27,4 +27,3 @@ Emails sent by kiwatch as alerts are processed by zapier and sent to the alarme 
 
 [tutorial]: https://cloud.google.com/functions/docs/tutorials/slack
 [code]: https://github.com/GoogleCloudPlatform/nodejs-docs-samples/tree/master/functions/slack
-``
