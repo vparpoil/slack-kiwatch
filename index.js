@@ -204,7 +204,7 @@ function incomingMail(body) {
 
     let htmlMessage = body.bodyHtml;
     // the GIF URL present in the email
-    let url = htmlMessage.match(/src=\"https:\/\/my.kiwatch.com\/.*"/)[0].split('"')[1];
+    let url = htmlMessage.match(/src=\"https:\/\/my.kiwatch.com\/get_snapshot_alert.gif.*"/)[0].split('"')[1];
 
     const post_options = {
         host: 'my.kiwatch.com',
