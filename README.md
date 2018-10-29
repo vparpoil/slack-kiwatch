@@ -39,24 +39,36 @@ Set up the following:
  
 Get the slack token, slack webhook url, slack signing secret to put in `config.js` file
 
-#### Set up Zapier
 
-Use Zapier to create a zap that take every incoming message in your alert mailbox to send it to the google function: create a step 1 that get the email using the gmail connector (or other), then create a step 2 : webhook that sends a POST request to your google function URL with the following data : 
-  * token (that is whatever you want), 
-  * bodyHtml (from step 1)
-  * email (from step 1)
-  
-Add the token that you chose to `config.js`
+#### Using direct gmail push notification
+
+Set up a topic named `alarme` to push notifications from gmail to the pubsub api (Follow this tutorial https://developers.google.com/gmail/api/guides/push)
+
+Enter the setting of your topic in `config.js` for key `PUBSUB_TOPIC`
+
+Create a client for the oauth authorisation flow [here](https://console.cloud.google.com/apis/credentials). And download the key file. Use the content of the key file to fill in `config.js` file with the `oauth` key.
+Set the account redirect url to `http://locahost:3000/oauth2callback`
+
+
+Obtain an `access_token` and a `refresh_token` for your gmail account which is receiving kiwatch alerts using. This command also set up the gmail inbox to send push notifications to the PubSub API
+```
+node oauth2.js 
+```
+
+Set the tokens in `config.js`
+
  
 #### Upload the function
 
 run `npm run deploy` to deploy the function to google cloud platform
 
+run `npm run deployBack` to deploy the backend function to google cloud platform using a subscription to the topic `alarme`
+
 ## How it works
 
 From slack, calls to `/alarme on` set the mode to INTRUSION, and `/alarme off` set the mode to NONE
 
-Emails sent by kiwatch as alerts are processed by zapier and sent to the alarme function (using the `ZAPIER_TOKEN` configuration token as `body.token`), which responds and sends a message to slack (using the `SLACK_WEBHOOKURL`) with action buttons.
+Emails sent by kiwatch as alerts are processed by gmail and sent to the handleNewEmail function, which responds and sends a message to slack (using the `SLACK_WEBHOOKURL`) with action buttons.
 
 
 ## Very useful resources to get started

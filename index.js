@@ -1,5 +1,9 @@
 'use strict';
 
+const red = "#E84855";
+const blue = '#3367d6';
+const green = "#20BF55";
+
 const configFile = require("./config.js");
 const config = configFile.config;
 const CAMERAS = configFile.cameras;
@@ -7,11 +11,9 @@ const CAMERAS = configFile.cameras;
 const https = require('https');
 const zlib = require("zlib");
 const Slack = require('slack-node');
+const {google} = require("googleapis");
+const gmail = google.gmail("v1");
 
-
-const red = "#E84855";
-const blue = '#3367d6';
-const green = "#20BF55";
 
 let sessionToken;
 
@@ -325,4 +327,120 @@ exports.alarme = (req, res) => {
             res.status(err.code || 500).send(err);
             return Promise.reject(err);
         });
+};
+
+
+function parseMessage(message) {
+    let text = message.snippet.split(".")[0];
+    let body = message.payload.body.data;
+    let bodyDecode = Buffer.from(body, 'base64').toString();
+    let url = bodyDecode.match(/src=\"https:\/\/my.kiwatch.com\/get_snapshot_alert.gif.*"/)[0].split('"')[1];
+    return {text: text, gifUrl: url};
+};
+
+/**
+ * Background Cloud Function to be triggered by Pub/Sub.
+ * This function is exported by index.js, and executed when
+ * the trigger topic receives a message.
+ * This execution is determined by the parameters of the deploy function (see package.js)
+ *
+ * @param {object} data The event payload.
+ * @param {object} context The event metadata.
+ */
+exports.handleNewEmail = async function (data, context) {
+    //const dataPayload = data.textPayload.data;
+
+    console.log("======handleNewEmail======V15");
+    //let details = Buffer.from(data.data, 'base64').toString();
+    //let historyId = JSON.parse(details).historyId;
+    // actually historyID does not help...
+    // see https://stackoverflow.com/questions/31797416/gmail-api-users-watch-no-details-for-historyid
+
+    // we need now to find the emails
+
+    // let's auth
+    const keys = config.oauth.web;
+    /**
+     * Create a new OAuth2 client with the configured keys.
+     */
+    const oauth2Client = new google.auth.OAuth2(
+        keys.client_id,
+        keys.client_secret,
+        keys.redirect_uris[0]
+    );
+    oauth2Client.credentials = {
+        access_token: config.GOOGLE_ACCESS_TOKEN,
+        refresh_token: config.GOOGLE_REFRESH_TOKEN
+    };
+    oauth2Client;
+    google.options({auth: oauth2Client});
+
+    // get the last email in mailbox
+    const res = await gmail.users.messages.list({
+        userId: "alarmesquare@gmail.com",
+        maxResults: 1,
+        q: "is:unread",
+    });
+
+    //console.log("=== RESULT== ");
+    //console.log(JSON.stringify(res.data));
+    if (!res.data.messages) {
+        console.log("ABORT, NO MESSAGE");
+        return;
+    }
+    // we get here the ids of the incoming messages
+    let messages = res.data.messages;
+    for (let index in messages) {
+        let message = messages[index];
+        // we use gmail API to know more about it
+        let fullMessage = await gmail.users.messages.get({
+            userId: "alarmesquare@gmail.com",
+            id: message.id,
+            format: 'full',
+        });
+        // extraction of the relevant content
+        //console.log("FULL message", JSON.stringify(fullMessage.data))
+        let parsed = parseMessage(fullMessage.data);
+        //console.log("parsed email", parsed)
+        if (parsed.text) {
+            // we send the result to slack if needed
+            const slack = new Slack();
+            slack.setWebhook(config.SLACK_WEBHOOKURL);
+            slack.webhook({
+                attachments: [
+                    {
+                        title: "DIRECT - " + parsed.text,
+                        fallback: "DIRECT - " + parsed.text,
+                        color: red,
+                        attachment_type: "default",
+                        callback_id: "buttonsAlerteEmail",
+                        image_url: parsed.gifUrl,
+                        actions: [
+                            {
+                                name: "ok",
+                                value: "ok",
+                                type: "button",
+                                style: "primary",
+                                text: "Je suis sur place, désactive l'alarme",
+                            },
+                            {
+                                name: "alert",
+                                value: "alert",
+                                type: "button",
+                                style: "danger",
+                                text: "C'est suspect, donne l'alerte",
+                            }
+                        ]
+                    }
+                ]
+
+            }, function (err, response) {
+                console.log("err", err);
+                console.log("response", response);
+            });
+        }
+
+
+    }
+
 };
