@@ -50,16 +50,13 @@ function formatSlackMessage(query, response) {
 
 
 function verifyWebhook(body) {
-    if (!body || (body.token !== config.SLACK_TOKEN && body.token !== config.ZAPIER_TOKEN)) {
+    if (!body || (body.token !== config.SLACK_TOKEN)) {
         const error = new Error('Invalid credentials');
         error.code = 401;
         throw error;
     }
     if (body.token === config.SLACK_TOKEN) {
         return "slack";
-    }
-    else if (body.token === config.ZAPIER_TOKEN) {
-        return "zapier";
     }
 }
 
@@ -198,66 +195,6 @@ async function gestionAlarme(query, requestBody) {
     return formatSlackMessage(query, {name: name})
 }
 
-function incomingMail(body) {
-    let email = body.email;
-    //console.log("email", JSON.stringify(email))
-    // exemple of message : "Un Mouvement a été détecté sur la caméra Entrée ."
-    let message = email.split('\n')[0];
-
-    let htmlMessage = body.bodyHtml;
-    // the GIF URL present in the email
-    let url = htmlMessage.match(/src=\"https:\/\/my.kiwatch.com\/get_snapshot_alert.gif.*"/)[0].split('"')[1];
-
-    const post_options = {
-        host: 'my.kiwatch.com',
-        port: '443',
-        path: '/restapi/services/login/credentials',
-        method: 'POST',
-        headers: {
-            "Accept": "application/json",
-            'Content-Type': 'application/json',
-            'apiVersion': "2.0"
-        }
-    };
-    // TODO ajouter qui a validé sur le bouton
-    // ajouter gif depuis le mail
-    const slack = new Slack();
-    slack.setWebhook(config.SLACK_WEBHOOKURL);
-    slack.webhook({
-        attachments: [
-            {
-                title: message,
-                fallback: message,
-                color: red,
-                attachment_type: "default",
-                callback_id: "buttonsAlerteEmail",
-                image_url: url,
-                actions: [
-                    {
-                        name: "ok",
-                        value: "ok",
-                        type: "button",
-                        style: "primary",
-                        text: "Je suis sur place, désactive l'alarme",
-                    },
-                    {
-                        name: "alert",
-                        value: "alert",
-                        type: "button",
-                        style: "danger",
-                        text: "C'est suspect, donne l'alerte",
-                    }
-                ]
-            }
-        ]
-
-    }, function (err, response) {
-        console.log("err", err);
-        console.log("response", response);
-    });
-
-    return "";
-}
 
 async function handleInteractiveMessage(body) {
     if (body.callback_id === "buttonsAlerteEmail") {
@@ -311,9 +248,6 @@ exports.alarme = (req, res) => {
                 else {
                     return gestionAlarme(body.text, body);
                 }
-            }
-            else if (client === "zapier") {
-                return incomingMail(body);
             }
         })
         .then((response) => {

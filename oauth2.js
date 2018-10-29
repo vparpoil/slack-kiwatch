@@ -101,7 +101,7 @@ async function runSample() {
             topicName: config.PUBSUB_TOPIC
         }
     };
-    // retrieve user profile
+    // watch notifications
     const res = await gmail.users.watch(options);
 }
 
