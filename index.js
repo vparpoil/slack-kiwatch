@@ -147,9 +147,27 @@ async function setDetectionService(cameraId, detectionMode) {
     return response.detectionServiceMode;
 }
 
+async function toggleAlarme(detectionMode, name, query, responseUrl) {
+    const data = await logInOnKiwatch();
+    if (detectionMode) {
+        for (let index in CAMERAS) {
+            const camera = CAMERAS[index];
+            await setDetectionService(camera.ressourceId, detectionMode)
+        }
+    }
+
+    // push here answer to slack
+    let response = formatSlackMessage(query, {name: name})
+    const slack = new Slack();
+    slack.setWebhook(responseUrl);
+    slack.webhook(response, function (err, response) {
+        console.log("err", err);
+        console.log("response", response);
+    });
+
+}
 
 async function gestionAlarme(query, requestBody) {
-    const data = await logInOnKiwatch();
     //console.log("request", requestBody);
     let detectionMode, name;
     if (query === "on") {
@@ -185,15 +203,17 @@ async function gestionAlarme(query, requestBody) {
         }
     }
 
-    if (detectionMode) {
-        for (let index in CAMERAS) {
-            const camera = CAMERAS[index];
-            await setDetectionService(camera.ressourceId, detectionMode)
-        }
-    }
+    // do not await here ! send a direct response !
+    toggleAlarme(detectionMode, name, query, requestBody.response_url).then((error, result) => {
+        // do not act
+    });
 
 
-    return formatSlackMessage(query, {name: name})
+    return {
+        response_type: 'ephemeral',
+        text: `Je suis en train de m'en occuper, attendez quelques secondes...`,
+        attachments: []
+    };
 }
 
 function incomingMail(body) {
@@ -303,6 +323,9 @@ exports.alarme = (req, res) => {
             const client = verifyWebhook(body);
             //console.log("body", body);
             if (client === "slack") {
+                console.log("body", body);
+
+
                 if (body.type === "interactive_message") {
                     return handleInteractiveMessage(body);
                 }
