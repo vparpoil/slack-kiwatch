@@ -166,6 +166,37 @@ async function toggleAlarme(detectionMode, name, query, responseUrl) {
 
 }
 
+async function watchMailBox() {
+    const keys = config.oauth.web;
+    /**
+     * Create a new OAuth2 client with the configured keys.
+     */
+    const oauth2Client = new google.auth.OAuth2(
+        keys.client_id,
+        keys.client_secret,
+        keys.redirect_uris[0]
+    );
+    oauth2Client.credentials = {
+        access_token: config.GOOGLE_ACCESS_TOKEN,
+        refresh_token: config.GOOGLE_REFRESH_TOKEN
+    };
+    oauth2Client;
+    google.options({auth: oauth2Client});
+    var watchOptions = {
+        userId: "me",
+        resource: {
+            labelIds: ["INBOX"],
+            topicName: config.PUBSUB_TOPIC
+        }
+    };
+    gmail.users.watch(watchOptions, function (error, result) {
+        if (error) {
+            console.error(error)
+        }
+    });
+
+}
+
 async function gestionAlarme(query, requestBody) {
     //console.log("request", requestBody);
     let detectionMode, name;
@@ -204,7 +235,10 @@ async function gestionAlarme(query, requestBody) {
 
     // do not await here ! send a direct response !
     toggleAlarme(detectionMode, name, query, requestBody.response_url).then((error, result) => {
-        // do not act
+        if (detectionMode === "INTRUSION") {
+            // here let's call watch again so it is called often (we need to do it at least once every 7 days)
+            watchMailBox();
+        }
     });
 
 

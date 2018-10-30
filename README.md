@@ -7,8 +7,8 @@ This repository uses google cloud function with nodeJS 8 runtime, which is in Be
 
 ## TODO 
 
-* [ ] add ability to call watch on the mailbox every 7 days
-* [ ] respond to messages in slack in a quick way and use response url to tell the user when it's done in order to avoid timeout
+* [x] add ability to call watch on the mailbox every 7 days
+* [x] respond to messages in slack in a quick way and use response url to tell the user when it's done in order to avoid timeout
 
 
 ### Setting up  
