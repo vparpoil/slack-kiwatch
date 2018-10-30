@@ -366,8 +366,8 @@ exports.handleNewEmail = async function (data, context) {
             slack.webhook({
                 attachments: [
                     {
-                        title: "DIRECT - " + parsed.text,
-                        fallback: "DIRECT - " + parsed.text,
+                        title: parsed.text,
+                        fallback: parsed.text,
                         color: red,
                         attachment_type: "default",
                         callback_id: "buttonsAlerteEmail",
