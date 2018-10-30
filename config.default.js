@@ -1,7 +1,6 @@
 exports.config = {
     "SLACK_TOKEN": "",
     "SLACK_WEBHOOKURL": "",
-    "ZAPIER_TOKEN": "",
     "KIWATCH_LOGIN": "",
     "KIWATCH_PASSWORD": "",
     "GOOGLE_ACCESS_TOKEN": "",
