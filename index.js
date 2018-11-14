@@ -377,8 +377,8 @@ function checkDate(message) {
             let dayOfWeek = momentDate.day();
             let hour = momentDate.hour();
             let minute = momentDate.minute();
-            // 6 for saturday and 0 for sunday
-            if (dayOfWeek === 0 || dayOfWeek === 6) {
+            // 6 for saturday and 0 for sunday (unused sunday)
+            if (dayOfWeek === 6) {
                 // cas du week end, désactiver les alertes entre 8h18 et 8h22 - GMT+1 !
                 if (hour === 7) {
                     if (minute >= 18 && minute <= 22) {
