@@ -371,9 +371,7 @@ function parseMessage(message) {
 function checkDate(message) {
     for (var index in message.payload.headers) {
         let header = message.payload.headers[index];
-        console.log("header", header)
         if (header.name.toLowerCase() === "date") {
-            console.log("found header date")
             let date = header.value;
             let momentDate = moment.utc(date);
             let dayOfWeek = momentDate.day();
