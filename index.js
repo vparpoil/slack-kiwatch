@@ -4,6 +4,7 @@ const red = "#E84855";
 const blue = '#3367d6';
 const green = "#20BF55";
 const orange = "#E28413";
+const yellow = "#FFF689";
 
 const configFile = require("./config.js");
 const config = configFile.config;
@@ -14,7 +15,7 @@ const zlib = require("zlib");
 const Slack = require('slack-node');
 const {google} = require("googleapis");
 const gmail = google.gmail("v1");
-
+const moment = require("moment");
 
 let sessionToken;
 
@@ -330,7 +331,7 @@ function parseMessage(message) {
     // check if message is from kiwatch :
     let isKiwatch = false;
     for (var index in message.payload.headers) {
-        let header = message.payload.headers[index]
+        let header = message.payload.headers[index];
         if (header.name.toLowerCase() === "reply-to" && header.value === "kiwatch@kiwatch.com") {
             isKiwatch = true;
             break;
@@ -367,6 +368,59 @@ function parseMessage(message) {
     return {text: text, gifUrl: url};
 };
 
+function checkDate(message) {
+    for (var index in message.payload.headers) {
+        let header = message.payload.headers[index];
+        console.log("header", header)
+        if (header.name.toLowerCase() === "date") {
+            console.log("found header date")
+            let date = header.value;
+            let momentDate = moment.utc(date);
+            let dayOfWeek = momentDate.day();
+            let hour = momentDate.hour();
+            let minute = momentDate.minute();
+            // 6 for saturday and 0 for sunday
+            if (dayOfWeek === 0 || dayOfWeek === 6) {
+                // cas du week end, désactiver les alertes entre 8h18 et 8h22 - GMT+1 !
+                if (hour === 7) {
+                    if (minute >= 18 && minute <= 22) {
+                        return "LUMIERE"
+                    }
+                }
+            } else {
+                // cas de la semaine, désactiver l'alarme à 7h18 - allumage des lumières à 7h20
+                if (hour === 6) { // - GMT+1 !
+                    if (minute >= 18) {
+                        let name = `Alarme désactivée automatiquement en semaine`;
+                        toggleAlarme("NONE", name, "off", config.SLACK_WEBHOOKURL).then((error, result) => {
+                            if (error) {
+                                console.error(error);
+                            }
+                        });
+                        return "LUMIERE"
+
+                    }
+                }
+
+            }
+            return false;
+        }
+    }
+    return false;
+}
+
+
+function markAsRead(gmail, messageId) {
+    // time to mark message as read
+    gmail.users.messages.modify({
+        userId: "me",
+        id: messageId,
+        resource: {
+            removeLabelIds: ["UNREAD"]
+        }
+    });
+}
+
 /**
  * Background Cloud Function to be triggered by Pub/Sub.
  * This function is exported by index.js, and executed when
@@ -379,7 +433,7 @@ function parseMessage(message) {
 exports.handleNewEmail = async function (data, context) {
     //const dataPayload = data.textPayload.data;
 
-    console.log("======handleNewEmail======V27`");
+    console.log("======handleNewEmail======V31`");
     //let details = Buffer.from(data.data, 'base64').toString();
     //let historyId = JSON.parse(details).historyId;
     // actually historyID does not help...
@@ -434,11 +488,29 @@ exports.handleNewEmail = async function (data, context) {
             console.log("NOT A KIWATCH MESSAGE");
             return;
         }
+        let testDate = checkDate(fullMessage.data);
+        const slack = new Slack();
+        slack.setWebhook(config.SLACK_WEBHOOKURL);
+        if (testDate === "LUMIERE") {
+            slack.webhook({
+                attachments: [
+                    {
+                        title: "La lumière s'est allumée et a déclenché la camera",
+                        fallback: "La lumière s'est allumée et a déclenché la camera",
+                        color: yellow,
+                        attachment_type: "default",
+                    }
+                ]
+
+            }, function (err, response) {
+                markAsRead(gmail, message.id);
+                console.log("err", err);
+                console.log("response", response);
+            });
+        }
         //console.log("parsed email", parsed)
-        if (parsed.text) {
+        if (testDate === false && parsed.text) {
             // we send the result to slack if needed
-            const slack = new Slack();
-            slack.setWebhook(config.SLACK_WEBHOOKURL);
             slack.webhook({
                 attachments: [
                     {
@@ -475,15 +547,7 @@ exports.handleNewEmail = async function (data, context) {
                 ]
 
             }, function (err, response) {
-                // time to mark message as read
-                gmail.users.messages.modify({
-                    userId: "me",
-                    id: message.id,
-                    resource: {
-                        removeLabelIds: ["UNREAD"]
-                    }
-                });
-
+                markAsRead(gmail, message.id);
                 console.log("err", err);
                 console.log("response", response);
             });
