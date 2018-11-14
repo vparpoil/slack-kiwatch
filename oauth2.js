@@ -105,7 +105,7 @@ async function runSample() {
     const res = await gmail.users.watch(options);
 }
 
-const scopes = ["https://www.googleapis.com/auth/gmail.readonly"];
+const scopes = ["https://www.googleapis.com/auth/gmail.modify"];
 runSample(oauth2Client).catch(console.error);
 
 authenticate(scopes)

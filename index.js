@@ -3,6 +3,7 @@
 const red = "#E84855";
 const blue = '#3367d6';
 const green = "#20BF55";
+const orange = "#E28413";
 
 const configFile = require("./config.js");
 const config = configFile.config;
@@ -268,6 +269,10 @@ async function handleInteractiveMessage(body) {
             text = `Demande d'alerte par ${body.user.name} - SANS EFFET POUR LE MOMENT (à venir)`;
             color = red
         }
+        else if (body.actions[0].value === "stop") {
+            text = `Faux positif remonté par ${body.user.name}`;
+            color = orange
+        }
         // replace the buttons with the following
         originalMessage.attachments[0].actions = [];
         originalMessage.attachments.push({title: text, color: color});
@@ -322,10 +327,43 @@ exports.alarme = (req, res) => {
 
 
 function parseMessage(message) {
+    // check if message is from kiwatch :
+    let isKiwatch = false;
+    for (var index in message.payload.headers) {
+        let header = message.payload.headers[index]
+        if (header.name.toLowerCase() === "reply-to" && header.value === "kiwatch@kiwatch.com") {
+            isKiwatch = true;
+            break;
+        }
+    }
+
+    if (isKiwatch === false) {
+        console.log("NOT A KIWATCH MESSAGE")
+        return false;
+    }
+
     let text = message.snippet.split(".")[0];
-    let body = message.payload.body.data;
+    let body;
+    if (typeof message.payload.body.data !== "undefined") {
+        body = message.payload.body.data;
+    }
+    else {
+        // decode parts
+        for (let index in message.payload.parts) {
+            let part = message.payload.parts[index];
+            if (part.mimeType === "text/html") {
+                body = part.body.data;
+            }
+        }
+
+    }
     let bodyDecode = Buffer.from(body, 'base64').toString();
-    let url = bodyDecode.match(/src=\"https:\/\/my.kiwatch.com\/get_snapshot_alert.gif.*"/)[0].split('"')[1];
+    //console.log("BODUYDECODE", bodyDecode)
+    let matched = bodyDecode.match(/src=\"https:\/\/my.kiwatch.com\/get_snapshot_alert.gif.*"/)
+    let url = "";
+    if (matched) {
+        url = matched[0].split('"')[1];
+    }
     return {text: text, gifUrl: url};
 };
 
@@ -341,7 +379,7 @@ function parseMessage(message) {
 exports.handleNewEmail = async function (data, context) {
     //const dataPayload = data.textPayload.data;
 
-    console.log("======handleNewEmail======V15");
+    console.log("======handleNewEmail======V27`");
     //let details = Buffer.from(data.data, 'base64').toString();
     //let historyId = JSON.parse(details).historyId;
     // actually historyID does not help...
@@ -390,8 +428,12 @@ exports.handleNewEmail = async function (data, context) {
             format: 'full',
         });
         // extraction of the relevant content
-        //console.log("FULL message", JSON.stringify(fullMessage.data))
+        console.log("FULL message", JSON.stringify(fullMessage.data));
         let parsed = parseMessage(fullMessage.data);
+        if (parsed === false) {
+            console.log("NOT A KIWATCH MESSAGE");
+            return;
+        }
         //console.log("parsed email", parsed)
         if (parsed.text) {
             // we send the result to slack if needed
@@ -412,23 +454,41 @@ exports.handleNewEmail = async function (data, context) {
                                 value: "ok",
                                 type: "button",
                                 style: "primary",
-                                text: "Je suis sur place, désactive l'alarme",
+                                text: "Désactive l'alarme",
+                            },
+                            {
+                                name: "stop",
+                                value: "stop",
+                                type: "button",
+                                style: "default",
+                                text: "Faux positif",
                             },
                             {
                                 name: "alert",
                                 value: "alert",
                                 type: "button",
                                 style: "danger",
-                                text: "C'est suspect, donne l'alerte",
+                                text: "Alerte",
                             }
                         ]
                     }
                 ]
 
             }, function (err, response) {
+                // time to mark message as read
+                gmail.users.messages.modify({
+                    userId: "me",
+                    id: message.id,
+                    resource: {
+                        removeLabelIds: ["UNREAD"]
+                    }
+                });
+
                 console.log("err", err);
                 console.log("response", response);
             });
+        } else {
+            console.log("NO TEXT IN PARSED")
         }
 
 
